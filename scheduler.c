@@ -224,7 +224,6 @@ void RR(int quantum)
   int count = 1, index = 0;
   for (int i = 0; i < allBurstTime; i++) {
 
-    // printf("Index: %d, PID: %d, Burst Time: %d\n", index, processors[index].pid, processors[index].burstTime);
     processors[index].burstTime -= 1;
 
     // Set ResponsTime when first time process
@@ -288,9 +287,6 @@ void RR(int quantum)
          */
         processors[index].waitingTime += processors[index].startTime - processors[index].finishTime;
       }
-      // if ( processors[index].pid == 3) {
-        // printf("PID %d, LastTime: %d, startTime: %d, Remain: %d\n", processors[index].pid, processors[index].finishTime, processors[index].startTime, processors[index].startTime - processors[index].finishTime);
-      // }
     }
   }
 
