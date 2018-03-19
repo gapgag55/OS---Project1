@@ -255,8 +255,6 @@ void RR(int quantum)
         // If all burstTime of processors is zero we terminate system.
         if (terminate++ == size) break;
 
-        // printf("Terminate: %d\n", terminate);
-
         /*
          * If burstTime is still 0
          * We find index again.
