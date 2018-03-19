@@ -191,8 +191,19 @@ void SJF()
  */
 void RR(int quantum)
 {
-  int index = 0;
   int allBurstTime = 0;
+  int tempBurstTime[size];
+
+  // Sort by ArrivalTime
+  for (int i = 0; i < size-1; i++) {
+    for (int j = i+1; j < size; j++) {
+      if ( processors[i].arrivalTime > processors[j].arrivalTime ) {
+        struct Candidate temp = processors[i];
+        processors[i] = processors[j];
+        processors[j] = temp;
+      }
+    }
+  }
 
   /* Find all burst time
    * easy for processing next Time
@@ -200,52 +211,96 @@ void RR(int quantum)
   for (int i = 0; i < size; i++) {
     allBurstTime += processors[i].burstTime;
 
+    tempBurstTime[i] = processors[i].burstTime;
+
     // Set default value
-    processors[i].responseTime = 0;
+    processors[i].responseTime = -1;
     processors[i].turnaroundTime = 0;
+
+    processors[i].startTime = 0;
+    processors[i].waitingTime = 0;
   }
 
+  int count = 1, index = 0;
   for (int i = 0; i < allBurstTime; i++) {
 
-    // Restore Index
-    if ( index > size ) {
-      index = 0;
-    }
-
-    if (i % quantum == 0) {
-      // Start with zero processors[0]
-      // and check burstTime
-      if ( i != 0 || processors[index].burstTime == 0) {
-        index++;
-      }
-
-      // Set ResponsTime when first time process
-      if ( processors[index].responseTime == 0 ) {
-        processors[index].responseTime = i;
-      }
-
-      // Set finishTime
-      if ( i != 0 ) {
-        processors[index-1].finishTime = i;
-      }
-    }
-
+    // printf("Index: %d, PID: %d, Burst Time: %d\n", index, processors[index].pid, processors[index].burstTime);
     processors[index].burstTime -= 1;
-    processors[index].turnaroundTime += 1;
 
-    // Set waiting time
-    for (int j = 0; j < size; j++) {
-      if ( j != i ) {
-        processors[index].waitingTime += 1;
-        processors[index].turnaroundTime += 1;
+    // Set ResponsTime when first time process
+    if (processors[index].responseTime == -1) {
+      processors[index].responseTime = i;
+    }
+    count++;
+
+    /*
+     * Change the processor when quantum process
+     * or burstTime of that processor is zero (Terminate)
+     */
+    if (count-1 == quantum || processors[index].burstTime <= 0) {
+      index++; count = 1;
+
+      processors[index-1].finishTime = i;
+
+      /*
+       * If the next processor also has burstTime equal 0
+       * We will find the next one that remain of allBurstTime
+       * Otherwise, we end of processing.
+       */
+      int terminate = 0;
+      while (1) {
+
+        // Restore index when out of bound.
+        if (index >= size) index = 0;
+
+        // If all burstTime of processors is zero we terminate system.
+        if (terminate++ == size) break;
+
+        // printf("Terminate: %d\n", terminate);
+
+        /*
+         * If burstTime is still 0
+         * We find index again.
+         */
+        if (processors[index].burstTime == 0) {
+          index++; continue;
+        } else {
+          // We found the next processors.
+          break;
+        }
       }
+
+      // We woould like to make sure it is actual finished.
+      if (terminate > size) break;
+
+      /* If at the first time of processing,
+       * Let start with waitingTime equal currentTime (or i);
+       */
+       processors[index].startTime = i;
+
+      if (processors[index].finishTime == 0) {
+        processors[index].waitingTime += i - processors[index].arrivalTime;
+      } else {
+        /*
+         * Calculate waiting Time
+         * StartTime is currentTime
+         * FinishTime is lastest finished processing of processor.
+         */
+        processors[index].waitingTime += processors[index].startTime - processors[index].finishTime;
+      }
+      // if ( processors[index].pid == 3) {
+        // printf("PID %d, LastTime: %d, startTime: %d, Remain: %d\n", processors[index].pid, processors[index].finishTime, processors[index].startTime, processors[index].startTime - processors[index].finishTime);
+      // }
     }
   }
 
-  // Set actually turnaround time
+  /*
+   * Restore burstTime by tempBurstTime
+   * and calculate turnaroundTime
+   */
   for(int i = 0; i < size; i++) {
-    printf("%d\n", processors[i].turnaroundTime);
-    processors[i].turnaroundTime = processors[i].turnaroundTime - processors[i].arrivalTime;
+    processors[i].burstTime = tempBurstTime[i];
+    processors[i].turnaroundTime =  processors[i].waitingTime + processors[i].burstTime;
   }
 
   output(1);
@@ -260,8 +315,12 @@ void output(int condition)
   // PID, process’s response time, total waiting time and its turnaround time
   if (condition == 0) {
 
+    printf("------------------------\n");
+    printf("|   Before Processing  |\n");
+    printf("------------------------\n");
+
     // Heading
-    printf("%s\t%5s\t%5s\t%5s\n",
+    printf("%s\t%-5s\t%-5s\t%s\n",
       "PID",
       "Burst Time",
       "Arrival time",
@@ -270,7 +329,7 @@ void output(int condition)
 
     // Body processors
     for (int i = 0; i < size; i++) {
-      printf("%d\t%5d\t%15d\t%13d\n",
+      printf("%d\t%-15d\t%-15d\t%d\n",
         processors[i].pid,
         processors[i].burstTime,
         processors[i].arrivalTime,
@@ -286,7 +345,11 @@ void output(int condition)
   float sumWaitingTime = 0;
   float sumTurnaroundTime = 0;
 
-  printf("%s\t%5s\t%5s\t%5s\n",
+  printf("------------------------\n");
+  printf("|   After Processing   |\n");
+  printf("------------------------\n");
+
+  printf("%s\t%-5s\t%-5s\t%s\n",
     "PID",
     "Response Time",
     "Waiting time",
@@ -294,7 +357,7 @@ void output(int condition)
   );
   for (int i = 0; i < size; i++) {
 
-    printf("%d\t%5d\t%15d\t%13d\n",
+    printf("%d\t%-15d\t%-15d\t%d\n",
       processors[i].pid,
       processors[i].responseTime,
       processors[i].waitingTime,
