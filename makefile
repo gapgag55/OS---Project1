@@ -3,7 +3,7 @@ all: scheduler.c
 	clear
 	$(RM) scheduler
 	gcc -o scheduler scheduler.c
-	./scheduler text.txt 4
+	./scheduler testcase.txt 4
 
 run:
-	./scheduler text.txt FCFS
+	./scheduler testcase.txt FCFS

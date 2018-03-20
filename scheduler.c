@@ -191,10 +191,9 @@ void SJF()
  */
 void RR(int quantum)
 {
-  int allBurstTime = 0;
-  int tempBurstTime[size];
-
-  // Sort by ArrivalTime
+  /*
+   * Use Selection sort to sort firstest arrive
+   */
   for (int i = 0; i < size-1; i++) {
     for (int j = i+1; j < size; j++) {
       if ( processors[i].arrivalTime > processors[j].arrivalTime ) {
@@ -205,96 +204,119 @@ void RR(int quantum)
     }
   }
 
-  /* Find all burst time
-   * easy for processing next Time
+  /*
+   * Initiate variables and processors struct value
    */
-  for (int i = 0; i < size; i++) {
-    allBurstTime += processors[i].burstTime;
+  int roundAmount = 0;
+  int tempBurstTime[size];
 
+  for (int i = 0; i < size; i++) {
+
+    // roundAmount will be used in the next loop
+    roundAmount += processors[i].burstTime;
     tempBurstTime[i] = processors[i].burstTime;
 
-    // Set default value
     processors[i].responseTime = -1;
-    processors[i].turnaroundTime = 0;
-
-    processors[i].startTime = 0;
-    processors[i].waitingTime = 0;
+    processors[i].finishTime = 0;
   }
 
-  int count = 1, index = 0;
-  for (int i = 0; i < allBurstTime; i++) {
+  /*
+   * Initiate variables to use soon
+   */
+  int index = 0;
+  int limit = 1;
+  int i = 0;
 
-    processors[index].burstTime -= 1;
-
-    // Set ResponsTime when first time process
-    if (processors[index].responseTime == -1) {
-      processors[index].responseTime = i;
-    }
-    count++;
+  /*
+   * Use Like-infinite loop to run the whole procecss
+   */
+  while (i < roundAmount) {
 
     /*
-     * Change the processor when quantum process
-     * or burstTime of that processor is zero (Terminate)
+     * Because of we use arrival time to sort
+     * and it will be processed every quantum time
+     * If some processors are not arrived, we will process some that
+     * arrive first.
      */
-    if (count-1 == quantum || processors[index].burstTime <= 0) {
-      index++; count = 1;
+    if (i % quantum == 0 && i != 0) {
+      limit += 1;
 
-      processors[index-1].finishTime = i;
+      // Restore variable
+      if (limit > size) limit = size;
+    }
 
+    // Test
+    // printf("====i: %d, limit: %d\n", i, limit);
+
+    /*
+     * First loop is processor that arrive and ready to process
+     */
+    for(int j = 0; j < limit; j++) {
       /*
-       * If the next processor also has burstTime equal 0
-       * We will find the next one that remain of allBurstTime
-       * Otherwise, we end of processing.
+       * Second loop will process
+       * the processor for running every quantum
        */
-      int terminate = 0;
-      while (1) {
+      for(int k = 0; k < quantum; k++) {
 
-        // Restore index when out of bound.
-        if (index >= size) index = 0;
+        // No process anymore when burstTime out of bound
+        if (processors[j].burstTime == 0) break;
 
-        // If all burstTime of processors is zero we terminate system.
-        if (terminate++ == size) break;
-
-        /*
-         * If burstTime is still 0
-         * We find index again.
-         */
-        if (processors[index].burstTime == 0) {
-          index++; continue;
-        } else {
-          // We found the next processors.
-          break;
+        // Set first responseTime
+        if (processors[j].responseTime == -1) {
+           processors[j].responseTime = i;
+           processors[j].startTime = i;
         }
+
+        // Test
+        // printf("I: %d, PID: %d\n", i, processors[j].pid);
+
+        // Remove the burstTime when finished process.
+        processors[j].burstTime -= 1;
+        i++;
       }
 
-      // We woould like to make sure it is actual finished.
-      if (terminate > size) break;
-
-      /* If at the first time of processing,
-       * Let start with waitingTime equal currentTime (or i);
+      /*
+       * Set finished time when burstTime is zero
+       * We place code here because we must to make sure that
+       * burstTime was processed.
        */
-       processors[index].startTime = i;
+      if (processors[j].burstTime == 0) {
 
-      if (processors[index].finishTime == 0) {
-        processors[index].waitingTime += i - processors[index].arrivalTime;
-      } else {
         /*
-         * Calculate waiting Time
-         * StartTime is currentTime
-         * FinishTime is lastest finished processing of processor.
+         * This instructions will be loaded various time then
+         * We will set only last time.
          */
-        processors[index].waitingTime += processors[index].startTime - processors[index].finishTime;
+        if (processors[j].finishTime == 0) {
+          processors[j].finishTime = i;
+        }
       }
     }
   }
 
   /*
-   * Restore burstTime by tempBurstTime
-   * and calculate turnaroundTime
+   * Use this as well in case of first arrival time is zero
    */
-  for(int i = 0; i < size; i++) {
-    processors[i].burstTime = tempBurstTime[i];
-    processors[i].turnaroundTime =  processors[i].waitingTime + processors[i].burstTime;
+  int firstArrive = processors[0].arrivalTime;
+
+  for (int i = 0; i < size; i++) {
+    /*
+     * Algorithm to calculate the results
+     */
+     processors[i].arrivalTime -= firstArrive;
+     processors[i].responseTime += firstArrive;
+     processors[i].burstTime = tempBurstTime[i];
+     processors[i].turnaroundTime =  processors[i].finishTime - processors[i].arrivalTime;
+     processors[i].waitingTime =  processors[i].turnaroundTime - processors[i].burstTime;
+
+
+     // Test
+    //  printf("PID: %d, turnaround: %d, finishTime :%d, burstTime: %d, arrive: %d\n",
+    //   processors[i].pid,
+    //   processors[i].turnaroundTime,
+    //   processors[i].finishTime,
+    //   processors[i].burstTime,
+    //   processors[i].arrivalTime
+    // );
   }
 
   output(1);
