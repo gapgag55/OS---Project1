@@ -207,90 +207,96 @@ void RR(int quantum)
   /*
    * Initiate variables and processors struct value
    */
-  int roundAmount = 0;
   int tempBurstTime[size];
 
   for (int i = 0; i < size; i++) {
-
-    // roundAmount will be used in the next loop
-    roundAmount += processors[i].burstTime;
     tempBurstTime[i] = processors[i].burstTime;
 
-    processors[i].responseTime = -1;
-    processors[i].finishTime = 0;
+    processors[i].startTime = -1;
+    processors[i].finishTime = -1;
   }
 
   /*
    * Initiate variables to use soon
    */
   int index = 0;
-  int limit = 1;
+  int count = 0;
   int i = 0;
-
+  
   /*
    * Use Like-infinite loop to run the whole procecss
    */
-  while (i < roundAmount) {
-
+  while (1) {
+    
     /*
-     * Because of we use arrival time to sort
-     * and it will be processed every quantum time
-     * If some processors are not arrived, we will process some that
-     * arrive first.
+     * Indexer will point to next process to run when count variable 
+     * equals quantum time
      */
-    if (i % quantum == 0 && i != 0) {
-      limit += 1;
+    if (count == quantum) {
 
-      // Restore variable
-      if (limit > size) limit = size;
-    }
-
-    // Test
-    // printf("====i: %d, limit: %d\n", i, limit);
-
-    /*
-     * First loop is processor that arrive and ready to process
-     */
-    for(int j = 0; j < limit; j++) {
-      /*
-       * Second loop will process
-       * the processor for running every quantum
-       */
-      for(int k = 0; k < quantum; k++) {
-
-        // No process anymore when burstTime out of bound
-        if (processors[j].burstTime == 0) break;
-
-        // Set first responseTime
-        if (processors[j].responseTime == -1) {
-           processors[j].responseTime = i;
-           processors[j].startTime = i;
-        }
-
-        // Test
-        // printf("I: %d, PID: %d\n", i, processors[j].pid);
-
-        // Remove the burstTime when finished process.
-        processors[j].burstTime -= 1;
-        i++;
-      }
+      // Reset count when run if instruction
+      count = 0;
 
       /*
-       * Set finished time when burstTime is zero
-       * We place code here because we must to make sure that
-       * burstTime was processed.
+       * Check next process that is it arrived or not?
+       * If so, next process ready to running
+       * else, previous processs will run next
        */
-      if (processors[j].burstTime == 0) {
-
-        /*
-         * This instructions will be loaded various time then
-         * We will set only last time.
-         */
-        if (processors[j].finishTime == 0) {
-          processors[j].finishTime = i;
-        }
+      if (processors[index+1].arrivalTime <= i) {
+        index++;
+      } else {
+        index--;
       }
+
+      // If index out of bound reset it to be first process
+      if (index >= size || index < 0) index = 0;
     }
+    
+    // Find process that remains of burstTime
+    while(processors[index].burstTime == 0) {
+      index++; count = 0;
+
+      /* Detect and Prevent in case of process does not arrive after 
+       * Previous process running finished
+       * If there is not arrived, we will wait until it arrives 
+       */
+      if (processors[index].arrivalTime > i) {
+        index--; i++;
+        continue;
+      }
+
+      // If index out of bound reset it to be first process
+      if (index >= size) index = 0;
+    }
+
+    // Running process
+    processors[index].burstTime -= 1;
+    count++;
+
+    // Find Finished Time 
+    if (processors[index].burstTime == 0 && processors[index].finishTime == -1) {
+      processors[index].finishTime = i+1;
+    } 
+
+    // Find Started Time
+    if (processors[index].startTime == -1) {
+      processors[index].startTime = i;
+    } 
+
+    // Increase Process time
+    i++;
+
+
+    /*
+     * This instructions is used to break the process
+     * when every process running finished 
+     */
+    int sum = 0;
+    for (int j = 0; j < size; j++)
+      if (processors[j].burstTime <= 0) sum += 1;
+
+    if (sum == size) break;
+
   }
 
   /*
@@ -302,21 +308,10 @@ void RR(int quantum)
     /*
      * Algorithm to calculate the results
      */
-     processors[i].arrivalTime -= firstArrive;
-     processors[i].responseTime += firstArrive;
+     processors[i].responseTime = processors[i].startTime - processors[i].arrivalTime;
      processors[i].burstTime = tempBurstTime[i];
-     processors[i].turnaroundTime =  processors[i].finishTime - processors[i].arrivalTime;
-     processors[i].waitingTime =  processors[i].turnaroundTime - processors[i].burstTime;
-
-
-     // Test
-    //  printf("PID: %d, turnaround: %d, finishTime :%d, burstTime: %d, arrive: %d\n",
-    //   processors[i].pid,
-    //   processors[i].turnaroundTime,
-    //   processors[i].finishTime,
-    //   processors[i].burstTime,
-    //   processors[i].arrivalTime
-    // );
+     processors[i].turnaroundTime = processors[i].finishTime - processors[i].arrivalTime;
+     processors[i].waitingTime = processors[i].turnaroundTime - processors[i].burstTime;
   }
 
   output(1);
@@ -390,7 +385,7 @@ void output(int condition)
    * the average values of the response time, waiting time, and turnaround time
    */
    printf("Throughput: %.2f  %.2f  %.2f  %.2f\n",
-     sumBurstTime/size,
+     size/sumBurstTime,
      sumResponseTime/size,
      sumWaitingTime/size,
      sumTurnaroundTime/size
